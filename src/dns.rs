@@ -121,3 +121,26 @@ impl DnsHeader {
         Ok(())
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DnsQuestion {
+    pub name: String,
+    pub qtype: QueryType
+}
+
+impl DnsQuestion {
+    pub fn new(name: String, qtype: QueryType) -> DnsQuestion {
+        DnsQuestion { name, qtype }
+    }
+
+    pub fn read(&mut self, buffer: &mut BytePacketBuffer) -> Result<()> {
+        // Query name
+        buffer.read_qname(&mut self.name)?;
+        // Query type
+        self.qtype = QueryType::from_num(buffer.read_u16()?);
+        // Class; ignore for now, since always 1
+        let _ = buffer.read_u16()?;
+        
+        Ok(())
+    }
+}
