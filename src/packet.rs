@@ -37,7 +37,7 @@ impl BytePacketBuffer {
     }
 
     // Read single byte and move along buffer
-    fn read(&mut self) -> Result<u8> {
+    pub fn read(&mut self) -> Result<u8> {
         if self.head >= MAX_SIZE {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
@@ -47,13 +47,13 @@ impl BytePacketBuffer {
         Ok(data)
     }
 
-    fn read_u16(&mut self) -> Result<u16> {
+    pub fn read_u16(&mut self) -> Result<u16> {
         let data = (self.read()? as u16) << 8 | self.read()? as u16;
 
         Ok(data)
     }
 
-    fn read_u32(&mut self) -> Result<u32> {
+    pub fn read_u32(&mut self) -> Result<u32> {
         let data = (self.read()? as u32) << 24 |
             (self.read()? as u32) << 16 |
             (self.read()? as u32) << 8 |
@@ -80,7 +80,7 @@ impl BytePacketBuffer {
         Ok(&self.buf[start..start+len])
     }
 
-    fn read_qname(&mut self, outstr: &mut String) -> Result<()> {
+    pub fn read_qname(&mut self, outstr: &mut String) -> Result<()> {
         // To handle jumps keep track of head offset locally
         let mut pos = self.head();
 
