@@ -103,14 +103,14 @@ impl DnsHeader {
         |QR|  Op|AA|TC|RD|RA|   z| Rcode|
         */
         let flags = buffer.read_u16()?;
-        self.rescode = ResponseCode::from_num((flags & 0xF) as u8); // 
+        self.rescode = ResponseCode::from_num((flags & 0xF) as u8);
         self.z = (flags >> 4) & 0xF > 0;
-        self.recursion_available = (flags >> 7) > 0;
-        self.recursion_desired = (flags >> 8) > 0;
-        self.truncated_message = (flags >> 9) > 0;
-        self.authoritative_answer = (flags >> 10) > 0;
+        self.recursion_available = (flags >> 7) & 1 > 0;
+        self.recursion_desired = (flags >> 8) & 1 > 0;
+        self.truncated_message = (flags >> 9) & 1 > 0;
+        self.authoritative_answer = (flags >> 10) & 1 > 0;
         self.opcode = ((flags >> 11) & 0xF) as u8;
-        self.response = (flags >> 15) > 0;
+        self.response = (flags >> 15) & 1 > 0;
 
         // Read record count sections; each field is 16 bits
         self.questions = buffer.read_u16()?;
