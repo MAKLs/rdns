@@ -23,7 +23,7 @@ impl BytePacketBuffer {
     }
 
     // Move head along buffer
-    fn step(&mut self, steps: usize) -> Result<()> {
+    pub fn step(&mut self, steps: usize) -> Result<()> {
         self.head += steps;
 
         Ok(())
