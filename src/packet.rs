@@ -1,4 +1,4 @@
-use std::io::{Error, ErrorKind, Read, Result};
+use std::io::{Error, ErrorKind, Result};
 
 // Maximum size of DNS packet
 const MAX_SIZE: usize = 512;

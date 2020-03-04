@@ -1,5 +1,5 @@
 use std::net::Ipv4Addr;
-use std::io::{Error, ErrorKind, Read, Result};
+use std::io::{Result};
 use crate::packet::*;
 
 // DNS response code
