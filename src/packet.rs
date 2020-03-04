@@ -42,7 +42,7 @@ impl BytePacketBuffer {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
         let data = self.buf[self.head];
-        self.head += 1;
+        self.step(1)?;
 
         Ok(data)
     }
