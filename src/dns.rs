@@ -105,7 +105,9 @@ impl DnsHeader {
         */
         let flags = buffer.read_u16()?;
         self.rescode = ResponseCode::from_num((flags & 0xF) as u8);
-        self.z = (flags >> 4) & 0xF > 0;
+        self.checking_disabled = (flags >> 4) & 1 > 0;
+        self.authed_data = (flags >> 5) & 1 > 0;
+        self.z = (flags >> 6) & 1 > 0;
         self.recursion_available = (flags >> 7) & 1 > 0;
         self.recursion_desired = (flags >> 8) & 1 > 0;
         self.truncated_message = (flags >> 9) & 1 > 0;
@@ -118,6 +120,37 @@ impl DnsHeader {
         self.answers = buffer.read_u16()?;
         self.authoritative_entries = buffer.read_u16()?;
         self.resource_entries = buffer.read_u16()?;
+
+        Ok(())
+    }
+
+    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<()> {
+        // Write packet ID
+        buffer.write_u16(self.id)?;
+
+        // Write first byte's-worth of flags
+        buffer.write_u8(
+            ((self.response as u8) << 7) |
+            (self.opcode << 6) |
+            ((self.authoritative_answer as u8) << 2) |
+            ((self.truncated_message as u8) << 1) |
+            (self.recursion_desired as u8)
+        )?;
+
+        // Write the next byte's-worth of flags
+        buffer.write_u8(
+            ((self.recursion_available as u8) << 7) |
+            ((self.z as u8) << 6) |
+            ((self.authed_data as u8) << 5) |
+            ((self.checking_disabled as u8) << 4) |
+            (self.rescode as u8)
+        )?;
+
+        // Write record counts
+        buffer.write_u16(self.questions)?;
+        buffer.write_u16(self.answers)?;
+        buffer.write_u16(self.authoritative_entries)?;
+        buffer.write_u16(self.resource_entries)?;
 
         Ok(())
     }
@@ -142,6 +175,16 @@ impl DnsQuestion {
         // Class; ignore for now, since always 1
         let _ = buffer.read_u16()?;
         
+        Ok(())
+    }
+
+    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<()> {
+        buffer.write_qname(&self.name)?;
+
+        let qtype = self.qtype.to_num();
+        buffer.write_u16(qtype)?;
+        buffer.write_u16(1)?;   // class
+
         Ok(())
     }
 }
@@ -192,6 +235,31 @@ impl DnsRecord {
                 Ok(DnsRecord::UNKNOWN {domain, ttl, data_len, qtype })
             }
         }
+    }
+
+    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<usize> {
+        let start_pos = buffer.head();
+        
+        match *self {
+            DnsRecord::A { ref domain, addr, ttl } => {
+                buffer.write_qname(domain)?;
+                buffer.write_u16(QueryType::A.to_num())?;
+                buffer.write_u16(1)?;   // class
+                buffer.write_u32(ttl)?;
+                buffer.write_u16(4)?;   // A record has 4-byte IP address
+                
+                // Write IP address
+                let octets = addr.octets();
+                for o in octets.iter() {
+                    buffer.write_u8(*o)?;
+                }
+            },
+            DnsRecord::UNKNOWN { .. } => {
+                println!("Unknown record: {:?}", self);
+            }
+        }
+
+        Ok(buffer.head() - start_pos)
     }
 }
 
@@ -249,5 +317,28 @@ impl DnsPacket {
         }
 
         Ok(result)
+    }
+
+    pub fn write(&mut self, buffer: &mut BytePacketBuffer) -> Result<()> {
+        self.header.questions = self.questions.len() as u16;
+        self.header.answers = self.answers.len() as u16;
+        self.header.authoritative_entries = self.authorities.len() as u16;
+        self.header.resource_entries = self.resources.len() as u16;
+        self.header.write(buffer)?;
+
+        for question in self.questions.iter() {
+            question.write(buffer)?;
+        }
+        for rec in self.answers.iter() {
+            rec.write(buffer)?;
+        }
+        for rec in self.authorities.iter() {
+            rec.write(buffer)?;
+        }
+        for rec in self.resources.iter() {
+            rec.write(buffer)?;
+        }
+
+        Ok(())
     }
 }

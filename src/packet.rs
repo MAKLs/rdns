@@ -2,6 +2,8 @@ use std::io::{Error, ErrorKind, Result};
 
 // Maximum size of DNS packet
 const MAX_SIZE: usize = 512;
+// Maximum size of label
+const MAX_LABEL_LEN: usize = 63;
 
 pub struct BytePacketBuffer {
     pub buf: [u8; MAX_SIZE],    // buffer data
@@ -18,7 +20,7 @@ impl BytePacketBuffer {
         }
     }
 
-    fn head(&self) -> usize {
+    pub fn head(&self) -> usize {
         self.head
     }
 
@@ -42,7 +44,7 @@ impl BytePacketBuffer {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
         let data = self.buf[self.head];
-        self.head += 1;
+        self.step(1)?;
 
         Ok(data)
     }
@@ -137,6 +139,62 @@ impl BytePacketBuffer {
         if !jumped {
             self.seek(pos)?;
         }
+
+        Ok(())
+    }
+
+    fn write(&mut self, val: u8) -> Result<()> {
+        if self.head() >= MAX_SIZE {
+            return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
+        }
+        self.buf[self.head()] = val;
+        self.step(1)?;
+        
+        Ok(())
+    }
+
+    pub fn write_u8(&mut self, val: u8) -> Result<()> {
+        self.write(val)?;
+
+        Ok(())
+    }
+
+    pub fn write_u16(&mut self, val: u16) -> Result<()> {
+        self.write((val >> 8) as u8)?;
+        self.write((val & 0xFF) as u8)?;
+
+        Ok(())
+    }
+
+    pub fn write_u32(&mut self, val: u32) -> Result<()> {
+        let mask = 0xFF;
+        self.write(((val >> 24) & mask) as u8)?;
+        self.write(((val >> 16) & mask) as u8)?;
+        self.write(((val >> 8) & mask) as u8)?;
+        self.write(((val >> 0) & mask) as u8)?;
+
+        Ok(())
+    }
+
+    pub fn write_qname(&mut self, qname: &str) -> Result<()> {
+        let labels = qname.split('.').collect::<Vec<&str>>();
+
+        for label in labels {
+            // Check label length
+            let len = label.len();
+            if len > MAX_LABEL_LEN {
+                return Err(Error::new(ErrorKind::InvalidInput, format!("Label exceeds maximum length: {0}", MAX_LABEL_LEN)));
+            }
+
+            // Write the length of the label and then the label
+            self.write_u8(len as u8)?;
+            for label_byte in label.as_bytes() {
+                self.write_u8(*label_byte)?;
+            }
+        }
+
+        // Write null byte to terminate qname
+        self.write_u8(0)?;
 
         Ok(())
     }
