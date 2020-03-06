@@ -20,7 +20,7 @@ impl BytePacketBuffer {
         }
     }
 
-    fn head(&self) -> usize {
+    pub fn head(&self) -> usize {
         self.head
     }
 
