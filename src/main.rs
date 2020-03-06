@@ -6,7 +6,7 @@ use std::net::UdpSocket;
 
 fn main() {
     // Perform A query for rust-lang.org
-    let qname = "google.com";
+    let qname = "rust-lang.org";
     let qtype = QueryType::A;
 
     // Use Quad9 server
