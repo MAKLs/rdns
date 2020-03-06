@@ -123,6 +123,37 @@ impl DnsHeader {
 
         Ok(())
     }
+
+    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<()> {
+        // Write packet ID
+        buffer.write_u16(self.id)?;
+
+        // Write first byte's-worth of flags
+        buffer.write_u8(
+            ((self.response as u8) << 7) |
+            (self.opcode << 6) |
+            ((self.authoritative_answer as u8) << 2) |
+            ((self.truncated_message as u8) << 1) |
+            (self.recursion_desired as u8)
+        )?;
+
+        // Write the next byte's-worth of flags
+        buffer.write_u8(
+            ((self.recursion_available as u8) << 7) |
+            ((self.z as u8) << 6) |
+            ((self.authed_data as u8) << 5) |
+            ((self.checking_disabled as u8) << 4) |
+            (self.rescode as u8)
+        )?;
+
+        // Write record counts
+        buffer.write_u16(self.questions)?;
+        buffer.write_u16(self.answers)?;
+        buffer.write_u16(self.authoritative_entries)?;
+        buffer.write_u16(self.resource_entries)?;
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
