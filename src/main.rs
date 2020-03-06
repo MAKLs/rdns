@@ -6,7 +6,7 @@ use std::net::UdpSocket;
 
 fn main() {
     // Perform A query for rust-lang.org
-    let qname = "rust-lang.org";
+    let qname = "google.com";
     let qtype = QueryType::A;
 
     // Use Quad9 server
@@ -42,7 +42,10 @@ fn main() {
     for rec in res_packet.answers.iter() {
         println!("{:#?}", rec);
     }
-    for rec in res_packet.answers.iter() {
+    for rec in res_packet.authorities.iter() {
+        println!("{:#?}", rec);
+    }
+    for rec in res_packet.resources.iter() {
         println!("{:#?}", rec);
     }
 }
