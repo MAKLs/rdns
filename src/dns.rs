@@ -236,6 +236,31 @@ impl DnsRecord {
             }
         }
     }
+
+    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<usize> {
+        let start_pos = buffer.head();
+        
+        match *self {
+            DnsRecord::A { ref domain, addr, ttl } => {
+                buffer.write_qname(domain)?;
+                buffer.write_u16(QueryType::A.to_num())?;
+                buffer.write_u16(1)?;   // class
+                buffer.write_u32(ttl)?;
+                buffer.write_u16(4)?;   // A record has 4-byte IP address
+                
+                // Write IP address
+                let octets = addr.octets();
+                for o in octets.iter() {
+                    buffer.write_u8(*o)?;
+                }
+            },
+            DnsRecord::UNKNOWN { .. } => {
+                println!("Unknown record: {:?}", self);
+            }
+        }
+
+        Ok(buffer.head() - start_pos)
+    }
 }
 
 #[derive(Clone, Debug)]
