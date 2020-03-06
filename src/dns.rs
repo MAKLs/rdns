@@ -177,6 +177,16 @@ impl DnsQuestion {
         
         Ok(())
     }
+
+    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<()> {
+        buffer.write_qname(&self.name)?;
+
+        let qtype = self.qtype.to_num();
+        buffer.write_u16(qtype)?;
+        buffer.write_u16(1)?;   // class
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
