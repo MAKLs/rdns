@@ -105,7 +105,9 @@ impl DnsHeader {
         */
         let flags = buffer.read_u16()?;
         self.rescode = ResponseCode::from_num((flags & 0xF) as u8);
-        self.z = (flags >> 4) & 0xF > 0;
+        self.checking_disabled = (flags >> 4) & 1 > 0;
+        self.authed_data = (flags >> 5) & 1 > 0;
+        self.z = (flags >> 6) & 1 > 0;
         self.recursion_available = (flags >> 7) & 1 > 0;
         self.recursion_desired = (flags >> 8) & 1 > 0;
         self.truncated_message = (flags >> 9) & 1 > 0;
