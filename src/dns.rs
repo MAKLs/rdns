@@ -262,6 +262,43 @@ impl DnsRecord {
 
                 Ok(DnsRecord::A {domain, addr, ttl})
             },
+            QueryType::AAAA => {
+                let mask = 0xFFFF;
+                let raw_addrs = (buffer.read_u32()?, buffer.read_u32()?, buffer.read_u32()?, buffer.read_u32()?,);
+                let addr = Ipv6Addr::new(
+                    ((raw_addrs.0 >> 16) & mask) as u16,
+                    (raw_addrs.0 & mask) as u16,
+                    ((raw_addrs.1 >> 16) & mask) as u16,
+                    (raw_addrs.1 & mask) as u16,
+                    ((raw_addrs.2 >> 16) & mask) as u16,
+                    (raw_addrs.2 & mask) as u16,
+                    ((raw_addrs.3 >> 16) & mask) as u16,
+                    (raw_addrs.3 & mask) as u16,
+                );
+
+                Ok(DnsRecord::AAAA {domain, addr, ttl})
+            },
+            // CNAME and NS have same payload
+            // TODO: refactor CNAME and NS into same arm
+            QueryType::CNAME => {
+                let mut host = String::new();
+                buffer.read_qname(&mut host);
+
+                Ok(DnsRecord::CNAME {domain, host, ttl})
+            },
+            QueryType::NS => {
+                let mut host = String::new();
+                buffer.read_qname(&mut host);
+
+                Ok(DnsRecord::NS {domain, host, ttl})
+            },
+            QueryType::MX => {
+                let priority = buffer.read_u16()?;
+                let mut host = String::new();
+                buffer.read_qname(&mut host)?;
+
+                Ok(DnsRecord::MX {domain, priority, host, ttl})
+            },
             QueryType::UNKNOWN(_) => {
                 buffer.step(data_len as usize)?;
 
