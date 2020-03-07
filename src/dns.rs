@@ -1,4 +1,4 @@
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::io::{Result};
 use crate::packet::*;
 
@@ -213,6 +213,27 @@ pub enum DnsRecord {
     A {
         domain: String,
         addr: Ipv4Addr,
+        ttl: u32
+    },
+    NS {
+        domain: String,
+        host: String,
+        ttl: u32
+    },
+    CNAME {
+        domain: String,
+        host: String,
+        ttl: u32
+    },
+    MX {
+        domain: String,
+        priority: u16,
+        host: String,
+        ttl: u32
+    },
+    AAAA {
+        domain: String,
+        addr: Ipv6Addr,
         ttl: u32
     }
 }
