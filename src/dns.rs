@@ -310,6 +310,7 @@ impl DnsRecord {
     pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<usize> {
         let start_pos = buffer.head();
         
+        // FIXME: refactor to write preamble outside of match arms
         match *self {
             DnsRecord::A { ref domain, addr, ttl } => {
                 buffer.write_qname(domain)?;
@@ -322,6 +323,66 @@ impl DnsRecord {
                 let octets = addr.octets();
                 for o in octets.iter() {
                     buffer.write_u8(*o)?;
+                }
+            },
+            DnsRecord::NS { ref domain, ref host, ttl } => {
+                buffer.write_qname(domain)?;
+                buffer.write_u16(QueryType::NS.to_num())?;
+                buffer.write_u16(1)?;   // class
+                buffer.write_u32(ttl)?;
+
+                // Preserve position to rewrite size of data later
+                let pos = buffer.head();
+                buffer.write_u16(0)?;
+
+                buffer.write_qname(host)?;
+
+                // Rewrite size of name server
+                let size = buffer.head() - (pos + 2);   // 2 bytes for data length
+                buffer.set_u16(pos, size as u16)?;
+            },
+            DnsRecord::CNAME { ref domain, ref host, ttl } => {
+                buffer.write_qname(domain)?;
+                buffer.write_u16(QueryType::CNAME.to_num())?;
+                buffer.write_u16(1)?;   // class
+                buffer.write_u32(ttl)?;
+
+                // Preserve position to rewrite size of data later
+                let pos = buffer.head();
+                buffer.write_u16(0)?;
+
+                buffer.write_qname(host)?;
+
+                // Rewrite size of canonical name
+                let size = buffer.head() - (pos + 2);   // 2 bytes for data length
+                buffer.set_u16(pos, size as u16)?;
+            },
+            DnsRecord::MX { ref domain, priority, ref host, ttl } => {
+                buffer.write_qname(domain)?;
+                buffer.write_u16(QueryType::MX.to_num())?;
+                buffer.write_u16(1)?;   // class
+                buffer.write_u32(ttl)?;
+
+                // Preserve position to rewrite size of data later
+                let pos = buffer.head();
+                buffer.write_u16(0)?;
+
+                buffer.write_u16(priority)?;
+                buffer.write_qname(host)?;
+
+                // Rewrite size of canonical name
+                let size = buffer.head() - (pos + 2);   // 2 bytes for data length
+                buffer.set_u16(pos, size as u16)?;
+            },
+            DnsRecord::AAAA { ref domain, ref addr, ttl } => {
+                buffer.write_qname(domain)?;
+                buffer.write_u16(QueryType::AAAA.to_num())?;
+                buffer.write_u16(1)?;   // class
+                buffer.write_u32(ttl)?;
+                buffer.write_u16(16)?;  // 16 byte IP address
+
+                for octet in &addr.segments() {
+                    buffer.write_u16(*octet)?;
                 }
             },
             DnsRecord::UNKNOWN { .. } => {
