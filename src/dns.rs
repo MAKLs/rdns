@@ -282,13 +282,13 @@ impl DnsRecord {
             // TODO: refactor CNAME and NS into same arm
             QueryType::CNAME => {
                 let mut host = String::new();
-                buffer.read_qname(&mut host);
+                buffer.read_qname(&mut host)?;
 
                 Ok(DnsRecord::CNAME {domain, host, ttl})
             },
             QueryType::NS => {
                 let mut host = String::new();
-                buffer.read_qname(&mut host);
+                buffer.read_qname(&mut host)?;
 
                 Ok(DnsRecord::NS {domain, host, ttl})
             },
