@@ -6,26 +6,18 @@ use std::io::{Result};
 pub struct Server<'a> {
     pub addr: &'a str,
     pub port: u16,
-    faddr: &'a str,
-    fport: u16,
-    socket: UdpSocket,
-    fsocket: UdpSocket
+    socket: UdpSocket
 }
 
 impl<'a> Server<'a> {
     pub fn new(addr: &'a str, port: u16) -> Server<'a> {
-        let (faddr, fport) = ("9.9.9.9", 53);
         let socket = UdpSocket::bind((addr, port)).unwrap();
-        let fsocket = UdpSocket::bind((addr, 3400)).unwrap();
 
-        Server { addr, port, socket, faddr, fport, fsocket }
+        Server { addr, port, socket }
     }
 
-    fn server(&self) -> (&'a str, u16) {
-        (self.faddr, self.fport)
-    }
-
-    fn lookup(&self, qname: &str, qtype: QueryType) -> Result<DnsPacket> {
+    fn lookup(&self, qname: &str, qtype: QueryType, server: (&'a str, u16)) -> Result<DnsPacket> {
+        let socket = UdpSocket::bind(("0.0.0.0", 3400)).unwrap();
         let mut packet = DnsPacket::new();
 
         packet.header.id = 7777;
@@ -35,12 +27,53 @@ impl<'a> Server<'a> {
 
         let mut req_buffer = BytePacketBuffer::new();
         packet.write(&mut req_buffer).unwrap();
-        self.fsocket.send_to(&req_buffer.buf[0..req_buffer.head()], self.server())?;
+        socket.send_to(&req_buffer.buf[0..req_buffer.head()], server)?;
 
         let mut res_buffer = BytePacketBuffer::new();
-        self.fsocket.recv_from(&mut res_buffer.buf).unwrap();
+        socket.recv_from(&mut res_buffer.buf).unwrap();
 
         DnsPacket::from_buffer(&mut res_buffer)
+    }
+
+    fn recursive_lookup(&self, qname: &str, qtype: QueryType) -> Result<DnsPacket> {
+        // For now we're always starting with *a.root-servers.net*.
+        let mut ns = "198.41.0.4".to_string();
+
+        // Loop until we resolve the lookup
+        loop {
+            println!("\tAttempting lookup of {:?} {} with ns {}", qtype, qname, ns);
+            let ns_copy = ns.clone();
+            let server = (ns_copy.as_str(), 53);
+            let response = self.lookup(qname, qtype.clone(), server)?;
+
+            // If we have answers and no errors or the name server tells us no, done
+            if (!response.answers.is_empty() && response.header.rescode == ResponseCode::NOERROR) ||
+                response.header.rescode == ResponseCode::NXDOMAIN
+            {
+                return Ok(response);
+            }
+
+            // Otherwise, find the next name server
+            // First, check if we have the next NS's A record
+            if let Some(new_ns) = response.get_resolved_ns(qname) {
+                ns = new_ns;
+                continue;
+            }
+
+            // If not, resolve the IP of the NS
+            let new_ns_name = match response.get_unresolved_ns(qname) {
+                Some(name) => name,
+                None => return Ok(response),
+            };
+
+            // Now, we have to recursively resolve this NS's IP address
+            let recursive_response = self.recursive_lookup(&new_ns_name, QueryType::A)?;
+            if let Some(new_ns) = recursive_response.get_random_a() {
+                ns = new_ns;
+            } else {
+                return Ok(response);
+            }
+        }
     }
 
     pub fn run(&self) -> ! {
@@ -80,7 +113,7 @@ impl<'a> Server<'a> {
                 println!("Received query: {:?}", question);
 
                 // Now, forward the request to the downstream server
-                if let Ok(result) = self.lookup(&question.name, question.qtype) {
+                if let Ok(result) = self.recursive_lookup(&question.name, question.qtype) {
                     response.questions.push(question.clone());
                     response.header.rescode = result.header.rescode;
                     for rec in result.answers {
