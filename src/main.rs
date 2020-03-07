@@ -6,8 +6,8 @@ use std::net::UdpSocket;
 
 fn main() {
     // Perform A query for rust-lang.org
-    let qname = "rust-lang.org";
-    let qtype = QueryType::A;
+    let qname = "yahoo.com";
+    let qtype = QueryType::MX;
 
     // Use Quad9 server
     let server = ("9.9.9.9", 53);
