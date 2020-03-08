@@ -1,6 +1,6 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::io::{Result};
-use crate::packet::*;
+use crate::dns::packet::*;
 use rand::{random};
 
 // DNS response code
