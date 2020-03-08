@@ -252,7 +252,7 @@ impl DnsRecord {
         match QueryType::from_num(qtype) {
             QueryType::A => {
                 let raw_addr = buffer.read_u32()?;
-                // TODO: refactor
+
                 let addr = Ipv4Addr::new(
                     ((raw_addr >> 24) & 0xFF) as u8,
                     ((raw_addr >> 16) & 0xFF) as u8,
@@ -283,8 +283,6 @@ impl DnsRecord {
 
                 Ok(DnsRecord::AAAA { domain, addr, ttl })
             }
-            // CNAME and NS have same payload
-            // TODO: refactor CNAME and NS into same arm
             QueryType::CNAME => {
                 let mut host = String::new();
                 buffer.read_qname(&mut host)?;
@@ -455,8 +453,6 @@ impl DnsPacket {
         let mut result = DnsPacket::new();
         result.header.read(buffer)?;
 
-        // TODO: refactor reading records from buffer
-
         // Read in questions
         for _ in 0..result.header.questions {
             let mut question = DnsQuestion::new(String::from(""), QueryType::UNKNOWN(0));
@@ -497,7 +493,12 @@ impl DnsPacket {
             question.write(buffer)?;
         }
 
-        for rec in self.answers.iter().chain(self.authorities.iter()).chain(self.resources.iter()) {
+        for rec in self
+            .answers
+            .iter()
+            .chain(self.authorities.iter())
+            .chain(self.resources.iter())
+        {
             rec.write(buffer)?;
         }
 

@@ -1,8 +1,8 @@
 use super::buffer::*;
 use super::protocol::*;
+use rand::random;
 use std::io::Result;
 use std::net::UdpSocket;
-use rand::random;
 
 pub struct Server<'a> {
     pub addr: &'a str,
@@ -64,7 +64,7 @@ impl<'a> Server<'a> {
                                 let cname_resp = self.recursive_lookup(&host, QueryType::A)?;
                                 println!("Resolved CNAME: {:?}", &host);
                                 response.header.rescode = cname_resp.header.rescode;
-            
+
                                 for a_rec in cname_resp.answers {
                                     cname_responses.push(a_rec);
                                     response.header.answers += 1;
@@ -72,11 +72,11 @@ impl<'a> Server<'a> {
                             };
                         }
                         response.answers.extend(cname_responses);
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
 
-                return Ok(response)
+                return Ok(response);
             }
 
             // Otherwise, find the next name server
