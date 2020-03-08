@@ -2,6 +2,7 @@ use super::buffer::*;
 use super::protocol::*;
 use std::io::Result;
 use std::net::UdpSocket;
+use rand::random;
 
 pub struct Server<'a> {
     pub addr: &'a str,
@@ -20,7 +21,7 @@ impl<'a> Server<'a> {
         let socket = UdpSocket::bind(("0.0.0.0", 3400)).unwrap();
         let mut packet = DnsPacket::new();
 
-        packet.header.id = 7777;
+        packet.header.id = random::<u16>();
         packet.header.questions = 1;
         packet.header.recursion_desired = true;
         packet
