@@ -6,11 +6,19 @@ use std::io::{Result};
 pub struct Server<'a> {
     pub addr: &'a str,
     pub port: u16,
+<<<<<<< HEAD
     socket: UdpSocket
+=======
+    faddr: &'a str,
+    fport: u16,
+    socket: UdpSocket,
+    fsocket: UdpSocket
+>>>>>>> 2b54775fac2ca7c2b1338ed0d043dfee5a92378e
 }
 
 impl<'a> Server<'a> {
     pub fn new(addr: &'a str, port: u16) -> Server<'a> {
+<<<<<<< HEAD
         let socket = UdpSocket::bind((addr, port)).unwrap();
 
         Server { addr, port, socket }
@@ -18,6 +26,20 @@ impl<'a> Server<'a> {
 
     fn lookup(&self, qname: &str, qtype: QueryType, server: (&'a str, u16)) -> Result<DnsPacket> {
         let socket = UdpSocket::bind(("0.0.0.0", 3400)).unwrap();
+=======
+        let (faddr, fport) = ("9.9.9.9", 53);
+        let socket = UdpSocket::bind((addr, port)).unwrap();
+        let fsocket = UdpSocket::bind((addr, 3400)).unwrap();
+
+        Server { addr, port, socket, faddr, fport, fsocket }
+    }
+
+    fn server(&self) -> (&'a str, u16) {
+        (self.faddr, self.fport)
+    }
+
+    fn lookup(&self, qname: &str, qtype: QueryType) -> Result<DnsPacket> {
+>>>>>>> 2b54775fac2ca7c2b1338ed0d043dfee5a92378e
         let mut packet = DnsPacket::new();
 
         packet.header.id = 7777;
@@ -27,14 +49,22 @@ impl<'a> Server<'a> {
 
         let mut req_buffer = BytePacketBuffer::new();
         packet.write(&mut req_buffer).unwrap();
+<<<<<<< HEAD
         socket.send_to(&req_buffer.buf[0..req_buffer.head()], server)?;
 
         let mut res_buffer = BytePacketBuffer::new();
         socket.recv_from(&mut res_buffer.buf).unwrap();
+=======
+        self.fsocket.send_to(&req_buffer.buf[0..req_buffer.head()], self.server())?;
+
+        let mut res_buffer = BytePacketBuffer::new();
+        self.fsocket.recv_from(&mut res_buffer.buf).unwrap();
+>>>>>>> 2b54775fac2ca7c2b1338ed0d043dfee5a92378e
 
         DnsPacket::from_buffer(&mut res_buffer)
     }
 
+<<<<<<< HEAD
     fn recursive_lookup(&self, qname: &str, qtype: QueryType) -> Result<DnsPacket> {
         // For now we're always starting with *a.root-servers.net*.
         let mut ns = "198.41.0.4".to_string();
@@ -76,6 +106,8 @@ impl<'a> Server<'a> {
         }
     }
 
+=======
+>>>>>>> 2b54775fac2ca7c2b1338ed0d043dfee5a92378e
     pub fn run(&self) -> ! {
         // Service requests serially for now
         loop {
@@ -113,7 +145,11 @@ impl<'a> Server<'a> {
                 println!("Received query: {:?}", question);
 
                 // Now, forward the request to the downstream server
+<<<<<<< HEAD
                 if let Ok(result) = self.recursive_lookup(&question.name, question.qtype) {
+=======
+                if let Ok(result) = self.lookup(&question.name, question.qtype) {
+>>>>>>> 2b54775fac2ca7c2b1338ed0d043dfee5a92378e
                     response.questions.push(question.clone());
                     response.header.rescode = result.header.rescode;
                     for rec in result.answers {
