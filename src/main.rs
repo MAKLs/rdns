@@ -1,7 +1,5 @@
 mod dns;
-mod packet;
-mod server;
-use server::Server;
+use dns::server::Server;
 
 fn main() {
     println!("Starting rDNS\n");
