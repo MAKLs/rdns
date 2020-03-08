@@ -496,13 +496,8 @@ impl DnsPacket {
         for question in self.questions.iter() {
             question.write(buffer)?;
         }
-        for rec in self.answers.iter() {
-            rec.write(buffer)?;
-        }
-        for rec in self.authorities.iter() {
-            rec.write(buffer)?;
-        }
-        for rec in self.resources.iter() {
+
+        for rec in self.answers.iter().chain(self.authorities.iter()).chain(self.resources.iter()) {
             rec.write(buffer)?;
         }
 
