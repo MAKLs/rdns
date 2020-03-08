@@ -1,6 +1,7 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::io::{Result};
 use crate::packet::*;
+use rand::{random};
 
 // DNS response code
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -471,5 +472,76 @@ impl DnsPacket {
         }
 
         Ok(())
+    }
+
+    // Randomly choose A record from packet
+    pub fn get_random_a(&self) -> Option<String> {
+        if !self.answers.is_empty() {
+            let idx = random::<usize>() % self.answers.len();
+            let record = &self.answers[idx];
+            if let DnsRecord::A{ ref addr, .. } = *record {
+                return Some(addr.to_string());
+            }
+        }
+
+        None
+    }
+
+    pub fn get_resolved_ns(&self, qname: &str) -> Option<String> {
+        let mut new_authorities: Vec<DnsRecord> = Vec::new();
+        for auth in &self.authorities {
+            if let DnsRecord::NS { ref domain, ref host, .. } = *auth {
+                if !qname.ends_with(domain) {
+                    continue;
+                }
+
+                // With an NS record, we MAY be able to grab its A record from the resources section
+                for resource in &self.resources {
+                    if let DnsRecord::A { ref domain, ref addr, ttl } = *resource {
+                        if domain != host {
+                            continue;
+                        }
+
+                        let rec = DnsRecord::A {
+                            domain: host.clone(),
+                            addr: *addr,
+                            ttl
+                        };
+
+                        new_authorities.push(rec);
+                    }
+                }
+            }
+        }
+
+        // Choose the first authority if we have any
+        if !new_authorities.is_empty() {
+            if let DnsRecord::A { addr, .. } = new_authorities[0] {
+                return Some(addr.to_string());
+            }
+        }
+
+        None
+    }
+
+    // Just in case the name server doesn't want to make it easy and give us an A record
+    pub fn get_unresolved_ns(&self, qname: &str) -> Option<String> {
+        let mut new_authorities: Vec<&String> = Vec::new();
+        for auth in &self.authorities {
+            if let DnsRecord::NS { ref domain, ref host, .. } = *auth {
+                if !qname.ends_with(domain) {
+                    continue;
+                }
+
+                new_authorities.push(host);
+            }
+        }
+
+        if !new_authorities.is_empty() {
+            let idx = random::<usize>() % new_authorities.len();
+            return Some(new_authorities[idx].clone());
+        }
+
+        None
     }
 }
