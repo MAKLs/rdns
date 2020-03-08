@@ -1,3 +1,3 @@
 mod dns;
-mod packet;
+mod buffer;
 pub mod server;
