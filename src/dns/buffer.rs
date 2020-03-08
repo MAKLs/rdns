@@ -6,17 +6,16 @@ const MAX_SIZE: usize = 512;
 const MAX_LABEL_LEN: usize = 63;
 
 pub struct BytePacketBuffer {
-    pub buf: [u8; MAX_SIZE],    // buffer data
-    pub head: usize             // byte-offset in packet
+    pub buf: [u8; MAX_SIZE], // buffer data
+    pub head: usize,         // byte-offset in packet
 }
 
 impl BytePacketBuffer {
-
     // Fresh buffer
     pub fn new() -> BytePacketBuffer {
         BytePacketBuffer {
             buf: [0; MAX_SIZE],
-            head: 0
+            head: 0,
         }
     }
 
@@ -56,10 +55,10 @@ impl BytePacketBuffer {
     }
 
     pub fn read_u32(&mut self) -> Result<u32> {
-        let data = (self.read()? as u32) << 24 |
-            (self.read()? as u32) << 16 |
-            (self.read()? as u32) << 8 |
-            (self.read()? as u32);
+        let data = (self.read()? as u32) << 24
+            | (self.read()? as u32) << 16
+            | (self.read()? as u32) << 8
+            | (self.read()? as u32);
 
         Ok(data)
     }
@@ -70,7 +69,7 @@ impl BytePacketBuffer {
         if offset >= MAX_SIZE {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
-        
+
         Ok(self.buf[offset])
     }
 
@@ -79,7 +78,7 @@ impl BytePacketBuffer {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
 
-        Ok(&self.buf[start..start+len])
+        Ok(&self.buf[start..start + len])
     }
 
     pub fn read_qname(&mut self, outstr: &mut String) -> Result<()> {
@@ -149,7 +148,7 @@ impl BytePacketBuffer {
         }
         self.buf[self.head()] = val;
         self.step(1)?;
-        
+
         Ok(())
     }
 
@@ -183,7 +182,10 @@ impl BytePacketBuffer {
             // Check label length
             let len = label.len();
             if len > MAX_LABEL_LEN {
-                return Err(Error::new(ErrorKind::InvalidInput, format!("Label exceeds maximum length: {0}", MAX_LABEL_LEN)));
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("Label exceeds maximum length: {0}", MAX_LABEL_LEN),
+                ));
             }
 
             // Write the length of the label and then the label

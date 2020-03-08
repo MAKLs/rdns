@@ -1,12 +1,12 @@
-use std::net::UdpSocket;
-use super::protocol::*;
 use super::buffer::*;
-use std::io::{Result};
+use super::protocol::*;
+use std::io::Result;
+use std::net::UdpSocket;
 
 pub struct Server<'a> {
     pub addr: &'a str,
     pub port: u16,
-    socket: UdpSocket
+    socket: UdpSocket,
 }
 
 impl<'a> Server<'a> {
@@ -23,7 +23,9 @@ impl<'a> Server<'a> {
         packet.header.id = 7777;
         packet.header.questions = 1;
         packet.header.recursion_desired = true;
-        packet.questions.push(DnsQuestion::new(String::from(qname), qtype));
+        packet
+            .questions
+            .push(DnsQuestion::new(String::from(qname), qtype));
 
         let mut req_buffer = BytePacketBuffer::new();
         packet.write(&mut req_buffer).unwrap();
@@ -41,14 +43,17 @@ impl<'a> Server<'a> {
 
         // Loop until we resolve the lookup
         loop {
-            println!("\tAttempting lookup of {:?} {} with ns {}", qtype, qname, ns);
+            println!(
+                "\tAttempting lookup of {:?} {} with ns {}",
+                qtype, qname, ns
+            );
             let ns_copy = ns.clone();
             let server = (ns_copy.as_str(), 53);
             let response = self.lookup(qname, qtype.clone(), server)?;
 
             // If we have answers and no errors or the name server tells us no, done
-            if (!response.answers.is_empty() && response.header.rescode == ResponseCode::NOERROR) ||
-                response.header.rescode == ResponseCode::NXDOMAIN
+            if (!response.answers.is_empty() && response.header.rescode == ResponseCode::NOERROR)
+                || response.header.rescode == ResponseCode::NXDOMAIN
             {
                 return Ok(response);
             }
@@ -86,7 +91,7 @@ impl<'a> Server<'a> {
                 Err(e) => {
                     println!("Failed to read packet: {:?}", e);
                     continue;
-                },
+                }
             };
 
             // Read DNS packet from buffer
@@ -136,7 +141,7 @@ impl<'a> Server<'a> {
             // Finally, write the response to a buffer and return to client
             let mut res_buffer = BytePacketBuffer::new();
             match response.write(&mut res_buffer) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     println!("Failed to write response packet to buffer: {:?}", e);
                     continue;
@@ -153,7 +158,7 @@ impl<'a> Server<'a> {
             };
 
             match self.socket.send_to(res_data, src) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     println!("Failed to send response buffer: {:?}", e);
                     continue;

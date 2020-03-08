@@ -1,3 +1,3 @@
-mod protocol;
 mod buffer;
+mod protocol;
 pub mod server;
