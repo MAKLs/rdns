@@ -50,13 +50,33 @@ impl<'a> Server<'a> {
             );
             let ns_copy = ns.clone();
             let server = (ns_copy.as_str(), 53);
-            let response = self.lookup(qname, qtype.clone(), server)?;
+            let mut response = self.lookup(qname, qtype.clone(), server)?;
 
             // If we have answers and no errors or the name server tells us no, done
             if (!response.answers.is_empty() && response.header.rescode == ResponseCode::NOERROR)
                 || response.header.rescode == ResponseCode::NXDOMAIN
             {
-                return Ok(response);
+                match qtype {
+                    QueryType::A => {
+                        let mut cname_responses: Vec<DnsRecord> = Vec::new();
+                        for rec in &response.answers {
+                            if let DnsRecord::CNAME { ref host, .. } = *rec {
+                                let cname_resp = self.recursive_lookup(&host, QueryType::A)?;
+                                println!("Resolved CNAME: {:?}", &host);
+                                response.header.rescode = cname_resp.header.rescode;
+            
+                                for a_rec in cname_resp.answers {
+                                    cname_responses.push(a_rec);
+                                    response.header.answers += 1;
+                                }
+                            };
+                        }
+                        response.answers.extend(cname_responses);
+                    },
+                    _ => {},
+                }
+
+                return Ok(response)
             }
 
             // Otherwise, find the next name server
