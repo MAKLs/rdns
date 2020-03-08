@@ -1,5 +1,5 @@
 use std::net::UdpSocket;
-use super::dns::*;
+use super::protocol::*;
 use super::buffer::*;
 use std::io::{Result};
 
