@@ -1,6 +1,6 @@
 use std::net::UdpSocket;
-use crate::dns::dns::*;
-use crate::dns::buffer::*;
+use super::dns::*;
+use super::buffer::*;
 use std::io::{Result};
 
 pub struct Server<'a> {
