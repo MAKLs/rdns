@@ -1,23 +1,24 @@
 use super::buffer::*;
+use super::context::ServerContext;
+use super::network::NetworkClient;
 use super::protocol::*;
+use super::resolver::{DnsResolver, ForwardResolver};
 use rand::random;
+use std::boxed::Box;
 use std::io::Result;
 use std::net::UdpSocket;
+use std::sync::Arc;
 
-pub struct Server<'a> {
-    pub addr: &'a str,
-    pub port: u16,
-    socket: UdpSocket,
+pub struct Server {
+    context: Arc<ServerContext>,
 }
 
-impl<'a> Server<'a> {
-    pub fn new(addr: &'a str, port: u16) -> Server<'a> {
-        let socket = UdpSocket::bind((addr, port)).unwrap();
-
-        Server { addr, port, socket }
+impl Server {
+    pub fn new(context: Arc<ServerContext>) -> Server {
+        Server { context }
     }
 
-    fn lookup(&self, qname: &str, qtype: QueryType, server: (&'a str, u16)) -> Result<DnsPacket> {
+    fn lookup(&self, qname: &str, qtype: QueryType, server: (&str, u16)) -> Result<DnsPacket> {
         let socket = UdpSocket::bind(("0.0.0.0", 3400)).unwrap();
         let mut packet = DnsPacket::new();
 
@@ -103,11 +104,14 @@ impl<'a> Server<'a> {
     }
 
     pub fn run(&self) -> ! {
+        let socket = UdpSocket::bind(("0.0.0.0", self.context.dns_port)).unwrap();
+        let resolver = self.context.get_resolver(self.context.clone());
+
         // Service requests serially for now
         loop {
             // Receive a request into a buffer
             let mut req_buffer = BytePacketBuffer::new();
-            let (_, src) = match self.socket.recv_from(&mut req_buffer.buf) {
+            let (_, src) = match socket.recv_from(&mut req_buffer.buf) {
                 Ok(data) => data,
                 Err(e) => {
                     println!("Failed to read packet: {:?}", e);
@@ -139,7 +143,7 @@ impl<'a> Server<'a> {
                 println!("Received query: {:?}", question);
 
                 // Now, forward the request to the downstream server
-                if let Ok(result) = self.recursive_lookup(&question.name, question.qtype) {
+                if let Ok(result) = resolver.resolve(&question.name, question.qtype, true) {
                     response.questions.push(question.clone());
                     response.header.rescode = result.header.rescode;
                     for rec in result.answers {
@@ -178,7 +182,7 @@ impl<'a> Server<'a> {
                 }
             };
 
-            match self.socket.send_to(res_data, src) {
+            match socket.send_to(res_data, src) {
                 Ok(_) => {}
                 Err(e) => {
                     println!("Failed to send response buffer: {:?}", e);

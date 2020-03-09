@@ -1,8 +1,10 @@
 mod dns;
-use dns::server::Server;
+use dns::{context::ServerContext, server::Server};
+use std::sync::Arc;
 
 fn main() {
     println!("Starting rDNS\n");
-    let server = Server::new("0.0.0.0", 2053);
+    let context = Arc::new(ServerContext::new());
+    let server = Server::new(context);
     server.run();
 }
