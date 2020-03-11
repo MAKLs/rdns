@@ -1,4 +1,4 @@
-use super::protocol::{QueryType, DnsPacket, ResponseCode};
+use super::protocol::{QueryType, DnsPacket, ResponseCode, DnsRecord};
 use super::context::ServerContext;
 use std::io::Result;
 use std::sync::Arc;
@@ -58,8 +58,70 @@ impl RecursiveResolver {
     pub fn new(context: Arc<ServerContext>) -> RecursiveResolver {
         RecursiveResolver { context }
     }
+}
 
-    pub fn execute(&self, qname: &str, qtype: QueryType) -> Result<DnsPacket> {
-        unimplemented!();
+impl DnsResolver for RecursiveResolver {
+    fn execute(&self, qname: &str, qtype: QueryType) -> Result<DnsPacket> {
+        // For now we're always starting with *a.root-servers.net*.
+        let mut ns = "198.41.0.4".to_string();
+
+        // Loop until we resolve the lookup
+        loop {
+            println!(
+                "\tAttempting lookup of {:?} {} with ns {}",
+                qtype, qname, ns
+            );
+            let ns_copy = ns.clone();
+            let server = (ns_copy.as_str(), 53);
+            let mut response = self.context.client.send_query(qname, qtype.clone(), server, true)?;
+
+            // If we have answers and no errors or the name server tells us no, done
+            if (!response.answers.is_empty() && response.header.rescode == ResponseCode::NOERROR)
+                || response.header.rescode == ResponseCode::NXDOMAIN
+            {
+                match qtype {
+                    QueryType::A => {
+                        let mut cname_responses: Vec<DnsRecord> = Vec::new();
+                        for rec in &response.answers {
+                            if let DnsRecord::CNAME { ref host, .. } = *rec {
+                                let cname_resp = self.resolve(&host, QueryType::A, true)?;
+                                println!("Resolved CNAME: {:?}", &host);
+                                response.header.rescode = cname_resp.header.rescode;
+
+                                for a_rec in cname_resp.answers {
+                                    cname_responses.push(a_rec);
+                                    response.header.answers += 1;
+                                }
+                            };
+                        }
+                        response.answers.extend(cname_responses);
+                    }
+                    _ => {}
+                }
+
+                return Ok(response);
+            }
+
+            // Otherwise, find the next name server
+            // First, check if we have the next NS's A record
+            if let Some(new_ns) = response.get_resolved_ns(qname) {
+                ns = new_ns;
+                continue;
+            }
+
+            // If not, resolve the IP of the NS
+            let new_ns_name = match response.get_unresolved_ns(qname) {
+                Some(name) => name,
+                None => return Ok(response),
+            };
+
+            // Now, we have to recursively resolve this NS's IP address
+            let recursive_response = self.resolve(&new_ns_name, QueryType::A, true)?;
+            if let Some(new_ns) = recursive_response.get_random_a() {
+                ns = new_ns;
+            } else {
+                return Ok(response);
+            }
+        }
     }
 }
