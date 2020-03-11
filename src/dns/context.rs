@@ -1,5 +1,5 @@
 use super::network::NetworkClient;
-use super::resolver::{ResolverMode, DnsResolver, ForwardResolver};
+use super::resolver::{ResolverMode, DnsResolver, ForwardResolver, RecursiveResolver};
 use std::boxed::Box;
 use std::sync::Arc;
 
@@ -20,10 +20,14 @@ impl ServerContext {
         }
     }
 
+    pub fn set_resolver_mode(&mut self, mode: ResolverMode) {
+        self.resolver_mode = mode;
+    }
+
     pub fn get_resolver(&self, context_ptr: Arc<ServerContext>) -> Box<dyn DnsResolver> {
         match self.resolver_mode {
             ResolverMode::Forwarding { ref host, port } => Box::new(ForwardResolver::new((host.clone(), port), context_ptr)),
-            _ => unimplemented!()
+            ResolverMode::Recursive => Box::new(RecursiveResolver::new(context_ptr)),
         }
     }
 }
