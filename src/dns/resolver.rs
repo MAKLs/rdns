@@ -8,6 +8,19 @@ pub enum ResolverMode {
     Recursive
 }
 
+impl ResolverMode {
+    pub fn from_str(name: &str, server: Option<&str>) -> Option<ResolverMode> {
+        match name {
+            "recursive" => Some(ResolverMode::Recursive),
+            "forward" => Some(ResolverMode::Forwarding {
+                host: server.unwrap().to_string(),
+                port : 53
+            }),
+            _ => None,
+        }
+    }
+}
+
 pub trait DnsResolver {
     fn resolve(&self, qname: &str, qtype: QueryType, recursive: bool) -> Result<DnsPacket> {
         // If query type is unknown, then we haven't implemented it yet
