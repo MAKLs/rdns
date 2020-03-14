@@ -2,8 +2,8 @@ use super::buffer::*;
 use super::context::ServerContext;
 use super::protocol::*;
 use std::boxed::Box;
-use std::io::Result;
-use std::net::UdpSocket;
+use std::io::{Result, Read};
+use std::net::{UdpSocket, TcpListener};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
@@ -231,6 +231,35 @@ impl TcpServer {
 
 impl DnsServer for TcpServer {
     fn run(&self, thread_count: usize) -> Result<thread::JoinHandle<()>> {
-        unimplemented!();
+        // Setup thread pool
+        let thread_pool = Threadpool::new(thread_count);
+        let listener = TcpListener::bind(("0.0.0.0", self.context.dns_port)).unwrap();
+        let context_ptr = self.context.clone();
+
+        let tcp_thread = thread::Builder::new().name("DNS - TCP server worker".to_string()).spawn(move || {
+            let context_clone = context_ptr.clone();
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(mut stream) => {
+                        thread_pool.execute(move || {
+                            let mut req_buffer = BytePacketBuffer::new(); // FIXME: use buffer with no length limit
+                            match stream.read(&mut req_buffer.buf) {
+                                Ok(bytes_read) => {
+                                    println!("Read {0} bytes from stream", bytes_read);
+                                },
+                                Err(e) => {
+                                    println!("Failed to read bytes from stream: {:?}", e);
+                                }
+                            }
+                        });
+                    },
+                    Err(e) => {
+                        println!("Failed to read TCP stream: {:?}", e);
+                    }
+                }
+            }
+        })?;
+
+        Ok(tcp_thread)
     }
 }
