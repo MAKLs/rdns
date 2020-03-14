@@ -134,6 +134,8 @@ pub trait DnsServer {
     fn run(&self, thread_count: usize) -> Result<thread::JoinHandle<()>>;
 }
 
+// UDP server
+
 pub struct UdpServer {
     context: Arc<ServerContext>,
 }
@@ -212,5 +214,23 @@ impl DnsServer for UdpServer {
             })?;
 
         Ok(udp_thread)
+    }
+}
+
+// TCP server
+
+pub struct TcpServer {
+    context: Arc<ServerContext>
+}
+
+impl TcpServer {
+    pub fn new(context: Arc<ServerContext>) -> TcpServer {
+        TcpServer { context }
+    }
+}
+
+impl DnsServer for TcpServer {
+    fn run(&self, thread_count: usize) -> Result<thread::JoinHandle<()>> {
+        unimplemented!();
     }
 }
