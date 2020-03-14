@@ -291,6 +291,7 @@ impl DnsRecord {
             }
             QueryType::NS => {
                 let mut host = String::new();
+                buffer.read_qname(&mut host)?;
                 Ok(DnsRecord::NS { domain, host, ttl })
             }
             QueryType::MX => {
