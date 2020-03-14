@@ -291,8 +291,6 @@ impl DnsRecord {
             }
             QueryType::NS => {
                 let mut host = String::new();
-                buffer.read_qname(&mut host)?;
-
                 Ok(DnsRecord::NS { domain, host, ttl })
             }
             QueryType::MX => {
@@ -323,7 +321,6 @@ impl DnsRecord {
     pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<usize> {
         let start_pos = buffer.head();
 
-        // FIXME: refactor to write preamble outside of match arms
         match *self {
             DnsRecord::A {
                 ref domain,
@@ -483,13 +480,57 @@ impl DnsPacket {
     }
 
     pub fn write(&mut self, buffer: &mut BytePacketBuffer) -> Result<()> {
+        // Setup temporary buffer in case this message gets truncated
+        let mut temp_buf = BytePacketBuffer::new();
+
+        // We should have enough space so far to write the header and questions
+
+        self.header.write(&mut temp_buf)?;
+        for question in &self.questions {
+            question.write(&mut temp_buf)?;
+        }
+
+        // This is where we may run out of space in the buffer... keep an eye out
+
+        let mut record_count = self.answers.len() + self.authorities.len() + self.resources.len();
+        for (i, rec) in self
+            .answers
+            .iter()
+            .chain(self.authorities.iter())
+            .chain(self.resources.iter())
+            .enumerate()
+        {
+            match rec.write(&mut temp_buf) {
+                Ok(_) => {
+                    // So far so good. Increment the counters in the header
+                    if i < self.answers.len() {
+                        self.header.answers += 1;
+                    } else if i < self.answers.len() + self.authorities.len() {
+                        self.header.authoritative_entries += 1;
+                    } else {
+                        self.header.resource_entries += 1;
+                    }
+                }
+                Err(e) => {
+                    /* We ran out of space!
+                        - Set the record count for the packet to however far we got
+                        - Set the truncated bit in the header
+                        - Stop trying to write to the packed buffer
+                    */
+                    println!("Packet {0}: {1:?}", self.header.id, e);
+                    record_count = i;
+                    self.header.truncated_message = true;
+                    break;
+                }
+            }
+        }
+
+        // Now that we know we can write this packet to the buffer, do it for real
+
         self.header.questions = self.questions.len() as u16;
-        self.header.answers = self.answers.len() as u16;
-        self.header.authoritative_entries = self.authorities.len() as u16;
-        self.header.resource_entries = self.resources.len() as u16;
         self.header.write(buffer)?;
 
-        for question in self.questions.iter() {
+        for question in &self.questions {
             question.write(buffer)?;
         }
 
@@ -498,6 +539,7 @@ impl DnsPacket {
             .iter()
             .chain(self.authorities.iter())
             .chain(self.resources.iter())
+            .take(record_count)
         {
             rec.write(buffer)?;
         }
