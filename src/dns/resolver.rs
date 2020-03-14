@@ -1,11 +1,11 @@
-use super::protocol::{QueryType, DnsPacket, ResponseCode, DnsRecord};
 use super::context::ServerContext;
+use super::protocol::{DnsPacket, DnsRecord, QueryType, ResponseCode};
 use std::io::Result;
 use std::sync::Arc;
 
 pub enum ResolverMode {
     Forwarding { host: String, port: u16 },
-    Recursive
+    Recursive,
 }
 
 impl ResolverMode {
@@ -14,7 +14,7 @@ impl ResolverMode {
             "recursive" => Some(ResolverMode::Recursive),
             "forward" => Some(ResolverMode::Forwarding {
                 host: server.unwrap().to_string(),
-                port : 53
+                port: 53,
             }),
             _ => None,
         }
@@ -43,7 +43,7 @@ pub trait DnsResolver {
 
 pub struct ForwardResolver {
     server: (String, u16),
-    context: Arc<ServerContext>
+    context: Arc<ServerContext>,
 }
 
 impl ForwardResolver {
@@ -55,7 +55,10 @@ impl ForwardResolver {
 impl DnsResolver for ForwardResolver {
     fn execute(&self, qname: &str, qtype: QueryType) -> Result<DnsPacket> {
         let (ref host, port) = &self.server;
-        let result = self.context.client.send_query(qname, qtype, (host, *port), true);
+        let result = self
+            .context
+            .client
+            .send_query(qname, qtype, (host, *port), true);
 
         // TODO: store the result in the DNS record cache
 
@@ -64,7 +67,7 @@ impl DnsResolver for ForwardResolver {
 }
 
 pub struct RecursiveResolver {
-    context: Arc<ServerContext>
+    context: Arc<ServerContext>,
 }
 
 impl RecursiveResolver {
@@ -86,7 +89,10 @@ impl DnsResolver for RecursiveResolver {
             );
             let ns_copy = ns.clone();
             let server = (ns_copy.as_str(), 53);
-            let mut response = self.context.client.send_query(qname, qtype.clone(), server, true)?;
+            let mut response =
+                self.context
+                    .client
+                    .send_query(qname, qtype.clone(), server, true)?;
 
             // If we have answers and no errors or the name server tells us no, done
             if (!response.answers.is_empty() && response.header.rescode == ResponseCode::NOERROR)
