@@ -18,7 +18,7 @@ impl ServerContext {
             resolver_mode: ResolverMode::Forwarding {
                 host: "0.0.0.0".to_string(),
                 port: 53,
-            }, // FIXME: read from command line or config file
+            },
             allow_recursion: true,
         }
     }

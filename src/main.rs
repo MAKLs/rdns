@@ -58,5 +58,4 @@ fn main() {
         Ok(handle) => handle.join().unwrap(),
         Err(e) => println!("Failed to run UDP server: {:?}", e),
     }
-    println!("Done");
 }

@@ -146,12 +146,10 @@ impl UdpServer {
 
 impl DnsServer for UdpServer {
     fn run(&self, thread_count: usize) -> Result<thread::JoinHandle<()>> {
-        // FIXME: pass threadcount as configuration param
         let thread_pool = Threadpool::new(thread_count);
         let socket = UdpSocket::bind(("0.0.0.0", self.context.dns_port)).unwrap();
         let socket_ptr = Arc::new(Mutex::new(socket.try_clone().unwrap()));
         let context_ptr = self.context.clone();
-        // let resolver = self.context.get_resolver(self.context.clone());
 
         let udp_thread = thread::Builder::new()
             .name("DNS - UDP server worker".to_string())
