@@ -1,4 +1,4 @@
-use super::buffer::BytePacketBuffer;
+use super::buffer::{BytePacketBuffer, ByteBuffer};
 use super::protocol::{DnsPacket, DnsQuestion, QueryType};
 use std::io::{Error, ErrorKind, Result};
 use std::net::UdpSocket;
