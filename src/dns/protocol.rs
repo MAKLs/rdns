@@ -142,7 +142,7 @@ impl DnsHeader {
         buffer.write_u16(self.id)?;
 
         // Write first byte's-worth of flags
-        buffer.write_u8(
+        buffer.write(
             ((self.response as u8) << 7)
                 | (self.opcode << 6)
                 | ((self.authoritative_answer as u8) << 2)
@@ -151,7 +151,7 @@ impl DnsHeader {
         )?;
 
         // Write the next byte's-worth of flags
-        buffer.write_u8(
+        buffer.write(
             ((self.recursion_available as u8) << 7)
                 | ((self.z as u8) << 6)
                 | ((self.authed_data as u8) << 5)
@@ -337,7 +337,7 @@ impl DnsRecord {
                 // Write IP address
                 let octets = addr.octets();
                 for o in octets.iter() {
-                    buffer.write_u8(*o)?;
+                    buffer.write(*o)?;
                 }
             }
             DnsRecord::NS {
