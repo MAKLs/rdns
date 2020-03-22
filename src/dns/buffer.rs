@@ -244,7 +244,7 @@ pub struct ExtendingBuffer {
 }
 
 impl ExtendingBuffer {
-    fn new() -> ExtendingBuffer {
+    pub fn new() -> ExtendingBuffer {
         ExtendingBuffer {
             buf: Vec::with_capacity(MAX_SIZE),  // TODO: decide sane capacity for performance
             head: 0
