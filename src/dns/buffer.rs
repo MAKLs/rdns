@@ -1,7 +1,7 @@
 use std::io::{Error, ErrorKind, Result};
 
 // Maximum size of DNS packet
-const MAX_SIZE: usize = 512;
+const MAX_UDP_SIZE: usize = 512;
 // Maximum size of label
 const MAX_LABEL_LEN: usize = 63;
 
@@ -163,7 +163,7 @@ pub trait ByteBuffer {
 }
 
 pub struct BytePacketBuffer {
-    pub buf: [u8; MAX_SIZE], // buffer data
+    pub buf: [u8; MAX_UDP_SIZE], // buffer data
     pub head: usize,         // byte-offset in packet
 }
 
@@ -171,7 +171,7 @@ impl BytePacketBuffer {
     // Fresh buffer
     pub fn new() -> BytePacketBuffer {
         BytePacketBuffer {
-            buf: [0; MAX_SIZE],
+            buf: [0; MAX_UDP_SIZE],
             head: 0,
         }
     }
@@ -196,7 +196,7 @@ impl ByteBuffer for BytePacketBuffer {
     }
 
     fn read(&mut self) -> Result<u8> {
-        if self.head >= MAX_SIZE {
+        if self.head >= MAX_UDP_SIZE {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
         let data = self.buf[self.head];
@@ -206,7 +206,7 @@ impl ByteBuffer for BytePacketBuffer {
     }
 
     fn get(&self, offset: usize) -> Result<u8> {
-        if offset >= MAX_SIZE {
+        if offset >= MAX_UDP_SIZE {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
 
@@ -214,7 +214,7 @@ impl ByteBuffer for BytePacketBuffer {
     }
 
     fn get_range(&self, start: usize, len: usize) -> Result<&[u8]> {
-        if start + len >= MAX_SIZE {
+        if start + len >= MAX_UDP_SIZE {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
 
@@ -222,7 +222,7 @@ impl ByteBuffer for BytePacketBuffer {
     }
 
     fn write(&mut self, val: u8) -> Result<()> {
-        if self.head() >= MAX_SIZE {
+        if self.head() >= MAX_UDP_SIZE {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
         self.buf[self.head()] = val;
@@ -246,7 +246,7 @@ pub struct ExtendingBuffer {
 impl ExtendingBuffer {
     pub fn new() -> ExtendingBuffer {
         ExtendingBuffer {
-            buf: Vec::with_capacity(MAX_SIZE),  // TODO: decide sane capacity for performance
+            buf: Vec::with_capacity(MAX_UDP_SIZE),  // TODO: decide sane capacity for performance
             head: 0
         }
     }
