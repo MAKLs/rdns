@@ -304,7 +304,7 @@ impl ByteBuffer for ExtendingBuffer {
     }
 
     fn set(&mut self, offset: usize, data: u8) -> Result<()> {
-        if self.head() >= self.buf.len() {
+        if offset >= self.buf.len() {
             return Err(Error::new(ErrorKind::InvalidInput, "Attempted write beyond buffer"));
         }
 
