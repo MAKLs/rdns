@@ -107,7 +107,7 @@ impl DnsHeader {
         }
     }
 
-    pub fn read(&mut self, buffer: &mut BytePacketBuffer) -> Result<()> {
+    pub fn read<T: ByteBuffer>(&mut self, buffer: &mut T) -> Result<()> {
         // Packet ID
         self.id = buffer.read_u16()?;
 
@@ -137,7 +137,7 @@ impl DnsHeader {
         Ok(())
     }
 
-    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<()> {
+    pub fn write<T: ByteBuffer>(&self, buffer: &mut T) -> Result<()> {
         // Write packet ID
         buffer.write_u16(self.id)?;
 
@@ -180,7 +180,7 @@ impl DnsQuestion {
         DnsQuestion { name, qtype }
     }
 
-    pub fn read(&mut self, buffer: &mut BytePacketBuffer) -> Result<()> {
+    pub fn read<T: ByteBuffer>(&mut self, buffer: &mut T) -> Result<()> {
         // Query name
         buffer.read_qname(&mut self.name)?;
         // Query type
@@ -191,7 +191,7 @@ impl DnsQuestion {
         Ok(())
     }
 
-    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<()> {
+    pub fn write<T: ByteBuffer>(&self, buffer: &mut T) -> Result<()> {
         buffer.write_qname(&self.name)?;
 
         let qtype = self.qtype.to_num();
@@ -240,7 +240,7 @@ pub enum DnsRecord {
 }
 
 impl DnsRecord {
-    pub fn read(buffer: &mut BytePacketBuffer) -> Result<DnsRecord> {
+    pub fn read<T: ByteBuffer>(buffer: &mut T) -> Result<DnsRecord> {
         let mut domain = String::new();
         buffer.read_qname(&mut domain)?;
 
@@ -319,7 +319,7 @@ impl DnsRecord {
         }
     }
 
-    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<usize> {
+    pub fn write<T: ByteBuffer>(&self, buffer: &mut T) -> Result<usize> {
         let start_pos = buffer.head();
 
         match *self {
@@ -446,7 +446,7 @@ impl DnsPacket {
         }
     }
 
-    pub fn from_buffer(buffer: &mut BytePacketBuffer) -> Result<DnsPacket> {
+    pub fn from_buffer<T: ByteBuffer>(buffer: &mut T) -> Result<DnsPacket> {
         // Read in header
         let mut result = DnsPacket::new();
         result.header.read(buffer)?;
@@ -480,7 +480,7 @@ impl DnsPacket {
         Ok(result)
     }
 
-    pub fn write(&mut self, buffer: &mut BytePacketBuffer) -> Result<()> {
+    pub fn write<T: ByteBuffer>(&mut self, buffer: &mut T) -> Result<()> {
         // Setup temporary buffer in case this message gets truncated
         let mut temp_buf = BytePacketBuffer::new();
 
