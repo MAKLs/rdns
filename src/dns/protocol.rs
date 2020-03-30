@@ -489,7 +489,7 @@ impl DnsPacket {
 
         // Setup temporary buffer in case this message gets truncated
         let mut temp_buf = ExtendingBuffer::new();
-        let max_size = buffer.max_size().unwrap_or(usize::max_value());
+        let max_size = buffer.max_size();
         let mut size = 0;
 
         // We should have enough space so far to write the header and questions

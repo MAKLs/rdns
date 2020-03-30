@@ -6,12 +6,12 @@ const MAX_UDP_SIZE: usize = 512;
 const MAX_LABEL_LEN: usize = 63;
 
 pub trait ByteBuffer {
-    const MAX_SIZE: Option<usize>;
+    const MAX_SIZE: usize;
 
     // Get current position of the cursor in the buffer.
     fn head(&self) -> usize;
 
-    fn max_size(&self) -> Option<usize> {
+    fn max_size(&self) -> usize {
         Self::MAX_SIZE
     }
 
@@ -184,7 +184,7 @@ impl BytePacketBuffer {
 }
 
 impl ByteBuffer for BytePacketBuffer {
-    const MAX_SIZE: Option<usize> = Some(MAX_UDP_SIZE);
+    const MAX_SIZE: usize = MAX_UDP_SIZE;
 
     fn head(&self) -> usize {
         self.head
@@ -203,7 +203,7 @@ impl ByteBuffer for BytePacketBuffer {
     }
 
     fn read(&mut self) -> Result<u8> {
-        if self.head >= MAX_UDP_SIZE {
+        if self.head >= self.max_size() {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
         let data = self.buf[self.head];
@@ -213,7 +213,7 @@ impl ByteBuffer for BytePacketBuffer {
     }
 
     fn get(&self, offset: usize) -> Result<u8> {
-        if offset >= MAX_UDP_SIZE {
+        if offset >= self.max_size() {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
 
@@ -221,7 +221,7 @@ impl ByteBuffer for BytePacketBuffer {
     }
 
     fn get_range(&self, start: usize, len: usize) -> Result<&[u8]> {
-        if start + len >= MAX_UDP_SIZE {
+        if start + len >= self.max_size() {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
 
@@ -229,7 +229,7 @@ impl ByteBuffer for BytePacketBuffer {
     }
 
     fn write(&mut self, val: u8) -> Result<()> {
-        if self.head() >= MAX_UDP_SIZE {
+        if self.head() >= self.max_size() {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
         }
         self.buf[self.head()] = val;
@@ -260,7 +260,7 @@ impl ExtendingBuffer {
 }
 
 impl ByteBuffer for ExtendingBuffer {
-    const MAX_SIZE: Option<usize> = None;
+    const MAX_SIZE: usize = usize::max_value();
 
     fn head(&self) -> usize {
         self.head
