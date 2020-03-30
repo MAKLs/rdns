@@ -2,7 +2,7 @@ use super::buffer::*;
 use super::context::ServerContext;
 use super::protocol::*;
 use std::boxed::Box;
-use std::io::{Result, Read};
+use std::io::{Result, Read, Write};
 use std::net::{UdpSocket, TcpListener};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -237,20 +237,73 @@ impl DnsServer for TcpServer {
         let context_ptr = self.context.clone();
 
         let tcp_thread = thread::Builder::new().name("DNS - TCP server worker".to_string()).spawn(move || {
-            let context_clone = context_ptr.clone();
             for stream in listener.incoming() {
+                let thread_context = context_ptr.clone();
                 match stream {
                     Ok(mut stream) => {
                         thread_pool.execute(move || {
-                            let mut req_buffer = BytePacketBuffer::new(); // FIXME: use buffer with no length limit
+                            let mut len_buf = [0;2];
+                            stream.read(&mut len_buf).unwrap();
+                            // Read request from stream into buffer
+                            // FIXME: use buffer with no size limit and capacity of length read from stream
+                            let mut req_buffer = BytePacketBuffer::new();
                             match stream.read(&mut req_buffer.buf) {
                                 Ok(bytes_read) => {
-                                    println!("Read {0} bytes from stream", bytes_read);
+                                    println!("Read {} bytes from stream", bytes_read);
                                 },
                                 Err(e) => {
                                     println!("Failed to read bytes from stream: {:?}", e);
+                                    return;
                                 }
                             }
+                            // Parse request buffer into packet
+                            let request = match DnsPacket::from_buffer(&mut req_buffer) {
+                                Ok(packet) => packet,
+                                Err(e) => {
+                                    println!("Failed to parse DNS packet: {:?}", e);
+                                    return;
+                                }
+                            };
+                            // Execute the query in the request and write the response into a buffer
+                            let mut response = execute_query(request, thread_context);
+                            let mut res_buffer = ExtendingBuffer::new();
+                            match response.write(&mut res_buffer) {
+                                Ok(_) => {},
+                                Err(e) => {
+                                    println!("Failed to write response packet to buffer: {:?}", e);
+                                    return;
+                                }
+                            }
+
+                            let res_len = res_buffer.head();
+                            let res_data = match res_buffer.get_range(0, res_len) {
+                                Ok(result) => result,
+                                Err(e) => {
+                                    println!("Failed to read response buffer: {:?}", e);
+                                    return;
+                                }
+                            };
+
+                            // Write packet length first
+                            let mut len_buf = [0; 2];
+                            len_buf[0] = (res_len >> 8) as u8;
+                            len_buf[1] = (res_len & 0xFF) as u8;
+                            match stream.write(&len_buf) {
+                                Ok(_) => {},
+                                Err(e) => {
+                                    println!("Failed to write packet length to buffer: {:?}", e);
+                                    return;
+                                }
+                            }
+                            // Now, write the data
+                            match stream.write(res_data) {
+                                Ok(_) => {},
+                                Err(e) => {
+                                    println!("Failed to send response buffer: {:?}", e);
+                                    return;
+                                }
+                            }
+                            
                         });
                     },
                     Err(e) => {
