@@ -137,7 +137,9 @@ impl DnsHeader {
         Ok(())
     }
 
-    pub fn write<T: ByteBuffer>(&self, buffer: &mut T) -> Result<()> {
+    pub fn write<T: ByteBuffer>(&self, buffer: &mut T) -> Result<usize> {
+        let start_pos = buffer.head();
+
         // Write packet ID
         buffer.write_u16(self.id)?;
 
@@ -165,7 +167,7 @@ impl DnsHeader {
         buffer.write_u16(self.authoritative_entries)?;
         buffer.write_u16(self.resource_entries)?;
 
-        Ok(())
+        Ok(buffer.head() - start_pos)
     }
 }
 
@@ -191,14 +193,16 @@ impl DnsQuestion {
         Ok(())
     }
 
-    pub fn write<T: ByteBuffer>(&self, buffer: &mut T) -> Result<()> {
+    pub fn write<T: ByteBuffer>(&self, buffer: &mut T) -> Result<usize> {
+        let start_pos = buffer.head();
+
         buffer.write_qname(&self.name)?;
 
         let qtype = self.qtype.to_num();
         buffer.write_u16(qtype)?;
         buffer.write_u16(1)?; // class
 
-        Ok(())
+        Ok(buffer.head() - start_pos)
     }
 }
 
