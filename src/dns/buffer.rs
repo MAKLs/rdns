@@ -6,8 +6,14 @@ const MAX_UDP_SIZE: usize = 512;
 const MAX_LABEL_LEN: usize = 63;
 
 pub trait ByteBuffer {
+    const MAX_SIZE: Option<usize>;
+
     // Get current position of the cursor in the buffer.
     fn head(&self) -> usize;
+
+    fn max_size(&self) -> Option<usize> {
+        Self::MAX_SIZE
+    }
 
     // Manipulating head of buffer
 
@@ -178,6 +184,7 @@ impl BytePacketBuffer {
 }
 
 impl ByteBuffer for BytePacketBuffer {
+    const MAX_SIZE: Option<usize> = Some(MAX_UDP_SIZE);
 
     fn head(&self) -> usize {
         self.head
@@ -253,6 +260,8 @@ impl ExtendingBuffer {
 }
 
 impl ByteBuffer for ExtendingBuffer {
+    const MAX_SIZE: Option<usize> = None;
+
     fn head(&self) -> usize {
         self.head
     }
