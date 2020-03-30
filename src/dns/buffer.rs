@@ -303,11 +303,11 @@ impl ByteBuffer for ExtendingBuffer {
     }
 
     fn get_range(&self, offset: usize, len: usize) -> Result<&[u8]> {
-        if offset + len >= self.buf.len() {
+        if offset + len > self.buf.len() {
             return Err(Error::new(ErrorKind::InvalidInput, "Attempted read beyond buffer"));
         }
 
-        let data = &self.buf[offset..len];
+        let data = &self.buf[offset..offset + len];
 
         Ok(data)
     }
