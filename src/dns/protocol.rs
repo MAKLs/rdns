@@ -480,15 +480,19 @@ impl DnsPacket {
         Ok(result)
     }
 
-    pub fn write<T: ByteBuffer>(&mut self, buffer: &mut T) -> Result<()> {
+    pub fn write<T: ByteBuffer>(&mut self, buffer: &mut T) -> Result<usize> {
+        let start_pos = buffer.head();
+
         // Setup temporary buffer in case this message gets truncated
-        let mut temp_buf = BytePacketBuffer::new();
+        let mut temp_buf = ExtendingBuffer::new();
+        let max_size = buffer.max_size().unwrap_or(usize::max_value());
+        let mut size = 0;
 
         // We should have enough space so far to write the header and questions
 
-        self.header.write(&mut temp_buf)?;
+        size += self.header.write(&mut temp_buf)?;
         for question in &self.questions {
-            question.write(&mut temp_buf)?;
+            size += question.write(&mut temp_buf)?;
         }
 
         // This is where we may run out of space in the buffer... keep an eye out
@@ -501,28 +505,23 @@ impl DnsPacket {
             .chain(self.resources.iter())
             .enumerate()
         {
-            match rec.write(&mut temp_buf) {
-                Ok(_) => {
-                    // So far so good. Increment the counters in the header
-                    if i < self.answers.len() {
-                        self.header.answers += 1;
-                    } else if i < self.answers.len() + self.authorities.len() {
-                        self.header.authoritative_entries += 1;
-                    } else {
-                        self.header.resource_entries += 1;
-                    }
-                }
-                Err(e) => {
-                    /* We ran out of space!
-                        - Set the record count for the packet to however far we got
-                        - Set the truncated bit in the header
-                        - Stop trying to write to the packed buffer
-                    */
-                    println!("Packet {0}: {1:?}", self.header.id, e);
-                    record_count = i;
-                    self.header.truncated_message = true;
-                    break;
-                }
+            size += rec.write(&mut temp_buf)?;
+            if size > max_size {
+                /* We ran out of space!
+                    - Set the record count for the packet to however far we got
+                    - Set the truncated bit in the header
+                    - Stop trying to write to the packed buffer
+                */
+                println!("Truncating message for packet {0}", self.header.id);
+                record_count = i;
+                self.header.truncated_message = true;
+                break;
+            } else if i < self.answers.len() {
+                self.header.answers += 1;
+            } else if i < self.answers.len() + self.authorities.len() {
+                self.header.authoritative_entries += 1;
+            } else {
+                self.header.resource_entries += 1;
             }
         }
 
@@ -545,7 +544,7 @@ impl DnsPacket {
             rec.write(buffer)?;
         }
 
-        Ok(())
+        Ok(buffer.head() - start_pos)
     }
 
     // Randomly choose A record from packet
