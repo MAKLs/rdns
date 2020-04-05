@@ -35,6 +35,7 @@ pub enum QueryType {
     CNAME,
     MX,
     AAAA,
+    TXT,
 }
 
 impl QueryType {
@@ -45,6 +46,7 @@ impl QueryType {
             QueryType::NS => 2,
             QueryType::CNAME => 5,
             QueryType::MX => 15,
+            QueryType::TXT => 16,
             QueryType::AAAA => 28,
         }
     }
@@ -55,6 +57,7 @@ impl QueryType {
             2 => QueryType::NS,
             5 => QueryType::CNAME,
             15 => QueryType::MX,
+            16 => QueryType::TXT,
             28 => QueryType::AAAA,
             _ => QueryType::UNKNOWN(num),
         }
@@ -236,6 +239,11 @@ pub enum DnsRecord {
         host: String,
         ttl: u32,
     },
+    TXT {
+        domain: String,
+        txt_data: String,
+        ttl: u32,
+    },
     AAAA {
         domain: String,
         addr: Ipv6Addr,
@@ -308,6 +316,19 @@ impl DnsRecord {
                     priority,
                     host,
                     ttl,
+                })
+            }
+            QueryType::TXT => {
+                let mut txt_buf = Vec::with_capacity(data_len as usize);
+
+                for _ in 0..data_len {
+                    txt_buf.push(buffer.read()?);
+                }
+
+                Ok(DnsRecord::TXT {
+                    domain,
+                    ttl,
+                    txt_data: String::from_utf8_lossy(&txt_buf).to_string(),
                 })
             }
             QueryType::UNKNOWN(_) => {
@@ -405,6 +426,22 @@ impl DnsRecord {
                 // Rewrite size of canonical name
                 let size = buffer.head() - (pos + 2); // 2 bytes for data length
                 buffer.set_u16(pos, size as u16)?;
+            }
+            DnsRecord::TXT {
+                ref domain,
+                ref txt_data,
+                ttl,
+            } => {
+                buffer.write_qname(domain)?;
+                buffer.write_u16(QueryType::TXT.to_num())?;
+                buffer.write_u16(1)?;
+                buffer.write_u32(ttl)?;
+                buffer.write_u16(txt_data.len() as u16)?;
+
+                // Write txt data
+                for byte in txt_data.as_bytes() {
+                    buffer.write(*byte)?;
+                }
             }
             DnsRecord::AAAA {
                 ref domain,
