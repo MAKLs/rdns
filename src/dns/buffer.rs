@@ -322,3 +322,87 @@ impl ByteBuffer for ExtendingBuffer {
         Ok(())
     }
 }
+
+pub struct VariableBuffer {
+    pub buf: Vec<u8>,
+    head: usize
+}
+
+impl VariableBuffer {
+    pub fn new(capacity: usize) -> Self {
+        let buf = vec![0; capacity];
+        Self {
+            buf,
+            head: 0
+        }
+    }
+}
+
+impl ByteBuffer for VariableBuffer {
+    const MAX_SIZE: usize = usize::max_value();
+
+    fn head(&self) -> usize {
+        self.head
+    }
+
+    fn max_size(&self) -> usize {
+        // FIXME: if buffer is mutable, this result cannot be trusted
+        self.buf.len()
+    }
+
+    fn step(&mut self, steps: usize) -> Result<()> {
+        self.head += steps;
+
+        Ok(())
+    }
+
+    fn seek(&mut self, offset: usize) -> Result<()> {
+        self.head = offset;
+
+        Ok(())
+    }
+
+    fn read(&mut self) -> Result<u8> {
+        let data = self.buf[self.head()];
+        self.step(1)?;
+
+        Ok(data)
+    }
+
+    fn write(&mut self, data: u8) -> Result<()> {
+        self.buf[self.head] = data;
+        self.step(1)?;
+
+        Ok(())
+    }
+
+    fn get(&self, offset: usize) -> Result<u8> {
+        if offset >= self.max_size() {
+            return Err(Error::new(ErrorKind::InvalidInput, "Attempted read beyond buffer"));
+        }
+
+        let data = self.buf[offset];
+
+        Ok(data)
+    }
+
+    fn get_range(&self, offset: usize, len: usize) -> Result<&[u8]> {
+        if offset + len > self.max_size() {
+            return Err(Error::new(ErrorKind::InvalidInput, "Attempted read beyond buffer"));
+        }
+
+        let data = &self.buf[offset..offset + len];
+
+        Ok(data)
+    }
+
+    fn set(&mut self, offset: usize, data: u8) -> Result<()> {
+        if offset >= self.max_size() {
+            return Err(Error::new(ErrorKind::InvalidInput, "Attempted write beyond buffer"));
+        }
+
+        self.buf[offset] = data;
+
+        Ok(())
+    }
+}
