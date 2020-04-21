@@ -35,6 +35,7 @@ pub enum QueryType {
     CNAME,
     MX,
     AAAA,
+    TXT,
 }
 
 impl QueryType {
@@ -45,6 +46,7 @@ impl QueryType {
             QueryType::NS => 2,
             QueryType::CNAME => 5,
             QueryType::MX => 15,
+            QueryType::TXT => 16,
             QueryType::AAAA => 28,
         }
     }
@@ -55,6 +57,7 @@ impl QueryType {
             2 => QueryType::NS,
             5 => QueryType::CNAME,
             15 => QueryType::MX,
+            16 => QueryType::TXT,
             28 => QueryType::AAAA,
             _ => QueryType::UNKNOWN(num),
         }
@@ -107,7 +110,7 @@ impl DnsHeader {
         }
     }
 
-    pub fn read(&mut self, buffer: &mut BytePacketBuffer) -> Result<()> {
+    pub fn read<T: ByteBuffer>(&mut self, buffer: &mut T) -> Result<()> {
         // Packet ID
         self.id = buffer.read_u16()?;
 
@@ -137,12 +140,14 @@ impl DnsHeader {
         Ok(())
     }
 
-    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<()> {
+    pub fn write<T: ByteBuffer>(&self, buffer: &mut T) -> Result<usize> {
+        let start_pos = buffer.head();
+
         // Write packet ID
         buffer.write_u16(self.id)?;
 
         // Write first byte's-worth of flags
-        buffer.write_u8(
+        buffer.write(
             ((self.response as u8) << 7)
                 | (self.opcode << 6)
                 | ((self.authoritative_answer as u8) << 2)
@@ -151,7 +156,7 @@ impl DnsHeader {
         )?;
 
         // Write the next byte's-worth of flags
-        buffer.write_u8(
+        buffer.write(
             ((self.recursion_available as u8) << 7)
                 | ((self.z as u8) << 6)
                 | ((self.authed_data as u8) << 5)
@@ -165,7 +170,7 @@ impl DnsHeader {
         buffer.write_u16(self.authoritative_entries)?;
         buffer.write_u16(self.resource_entries)?;
 
-        Ok(())
+        Ok(buffer.head() - start_pos)
     }
 }
 
@@ -180,7 +185,7 @@ impl DnsQuestion {
         DnsQuestion { name, qtype }
     }
 
-    pub fn read(&mut self, buffer: &mut BytePacketBuffer) -> Result<()> {
+    pub fn read<T: ByteBuffer>(&mut self, buffer: &mut T) -> Result<()> {
         // Query name
         buffer.read_qname(&mut self.name)?;
         // Query type
@@ -191,14 +196,16 @@ impl DnsQuestion {
         Ok(())
     }
 
-    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<()> {
+    pub fn write<T: ByteBuffer>(&self, buffer: &mut T) -> Result<usize> {
+        let start_pos = buffer.head();
+
         buffer.write_qname(&self.name)?;
 
         let qtype = self.qtype.to_num();
         buffer.write_u16(qtype)?;
         buffer.write_u16(1)?; // class
 
-        Ok(())
+        Ok(buffer.head() - start_pos)
     }
 }
 
@@ -232,6 +239,11 @@ pub enum DnsRecord {
         host: String,
         ttl: u32,
     },
+    TXT {
+        domain: String,
+        txt_data: String,
+        ttl: u32,
+    },
     AAAA {
         domain: String,
         addr: Ipv6Addr,
@@ -240,7 +252,7 @@ pub enum DnsRecord {
 }
 
 impl DnsRecord {
-    pub fn read(buffer: &mut BytePacketBuffer) -> Result<DnsRecord> {
+    pub fn read<T: ByteBuffer>(buffer: &mut T) -> Result<DnsRecord> {
         let mut domain = String::new();
         buffer.read_qname(&mut domain)?;
 
@@ -292,7 +304,6 @@ impl DnsRecord {
             QueryType::NS => {
                 let mut host = String::new();
                 buffer.read_qname(&mut host)?;
-
                 Ok(DnsRecord::NS { domain, host, ttl })
             }
             QueryType::MX => {
@@ -305,6 +316,19 @@ impl DnsRecord {
                     priority,
                     host,
                     ttl,
+                })
+            }
+            QueryType::TXT => {
+                let mut txt_buf = Vec::with_capacity(data_len as usize);
+
+                for _ in 0..data_len {
+                    txt_buf.push(buffer.read()?);
+                }
+
+                Ok(DnsRecord::TXT {
+                    domain,
+                    ttl,
+                    txt_data: String::from_utf8_lossy(&txt_buf).to_string(),
                 })
             }
             QueryType::UNKNOWN(_) => {
@@ -320,10 +344,9 @@ impl DnsRecord {
         }
     }
 
-    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<usize> {
+    pub fn write<T: ByteBuffer>(&self, buffer: &mut T) -> Result<usize> {
         let start_pos = buffer.head();
 
-        // FIXME: refactor to write preamble outside of match arms
         match *self {
             DnsRecord::A {
                 ref domain,
@@ -339,7 +362,7 @@ impl DnsRecord {
                 // Write IP address
                 let octets = addr.octets();
                 for o in octets.iter() {
-                    buffer.write_u8(*o)?;
+                    buffer.write(*o)?;
                 }
             }
             DnsRecord::NS {
@@ -404,6 +427,22 @@ impl DnsRecord {
                 let size = buffer.head() - (pos + 2); // 2 bytes for data length
                 buffer.set_u16(pos, size as u16)?;
             }
+            DnsRecord::TXT {
+                ref domain,
+                ref txt_data,
+                ttl,
+            } => {
+                buffer.write_qname(domain)?;
+                buffer.write_u16(QueryType::TXT.to_num())?;
+                buffer.write_u16(1)?;
+                buffer.write_u32(ttl)?;
+                buffer.write_u16(txt_data.len() as u16)?;
+
+                // Write txt data
+                for byte in txt_data.as_bytes() {
+                    buffer.write(*byte)?;
+                }
+            }
             DnsRecord::AAAA {
                 ref domain,
                 ref addr,
@@ -448,7 +487,7 @@ impl DnsPacket {
         }
     }
 
-    pub fn from_buffer(buffer: &mut BytePacketBuffer) -> Result<DnsPacket> {
+    pub fn from_buffer<T: ByteBuffer>(buffer: &mut T) -> Result<DnsPacket> {
         // Read in header
         let mut result = DnsPacket::new();
         result.header.read(buffer)?;
@@ -482,14 +521,57 @@ impl DnsPacket {
         Ok(result)
     }
 
-    pub fn write(&mut self, buffer: &mut BytePacketBuffer) -> Result<()> {
+    pub fn write<T: ByteBuffer>(&mut self, buffer: &mut T) -> Result<usize> {
+        let start_pos = buffer.head();
+
+        // Setup temporary buffer in case this message gets truncated
+        let mut temp_buf = ExtendingBuffer::new();
+        let max_size = buffer.max_size();
+        let mut size = 0;
+
+        // We should have enough space so far to write the header and questions
+
+        size += self.header.write(&mut temp_buf)?;
+        for question in &self.questions {
+            size += question.write(&mut temp_buf)?;
+        }
+
+        // This is where we may run out of space in the buffer... keep an eye out
+
+        let mut record_count = self.answers.len() + self.authorities.len() + self.resources.len();
+        for (i, rec) in self
+            .answers
+            .iter()
+            .chain(self.authorities.iter())
+            .chain(self.resources.iter())
+            .enumerate()
+        {
+            size += rec.write(&mut temp_buf)?;
+            if size > max_size {
+                /* We ran out of space!
+                    - Set the record count for the packet to however far we got
+                    - Set the truncated bit in the header
+                    - Stop trying to write to the packed buffer
+                */
+                println!("Truncating message for packet {0}", self.header.id);
+                record_count = i;
+                self.header.truncated_message = true;
+                break;
+            } else if i < self.answers.len() {
+                self.header.answers += 1;
+            } else if i < self.answers.len() + self.authorities.len() {
+                self.header.authoritative_entries += 1;
+            } else {
+                self.header.resource_entries += 1;
+            }
+        }
+
+        // Now that we know we can write this packet to the buffer, do it for real
+
         self.header.questions = self.questions.len() as u16;
-        self.header.answers = self.answers.len() as u16;
-        self.header.authoritative_entries = self.authorities.len() as u16;
-        self.header.resource_entries = self.resources.len() as u16;
         self.header.write(buffer)?;
 
-        for question in self.questions.iter() {
+        for question in &self.questions {
             question.write(buffer)?;
         }
 
@@ -498,11 +580,12 @@ impl DnsPacket {
             .iter()
             .chain(self.authorities.iter())
             .chain(self.resources.iter())
+            .take(record_count)
         {
             rec.write(buffer)?;
         }
 
-        Ok(())
+        Ok(buffer.head() - start_pos)
     }
 
     // Randomly choose A record from packet

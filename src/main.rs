@@ -2,7 +2,7 @@ extern crate clap;
 use clap::{App, Arg};
 mod dns;
 use dns::server::DnsServer;
-use dns::{context::ServerContext, resolver::ResolverMode, server::UdpServer};
+use dns::{context::ServerContext, resolver::ResolverMode, server::{UdpServer, TcpServer}};
 use std::sync::Arc;
 
 fn main() {
@@ -47,14 +47,20 @@ fn main() {
         context.set_resolver_mode(ResolverMode::Recursive);
     }
 
-    // Run server
+    let context_ptr = Arc::new(context);
+
+    // Run servers
     let thread_count = matches
         .value_of("thread-count")
         .unwrap()
         .parse::<usize>()
         .expect("Failed to parse thread count");
-    let server = UdpServer::new(Arc::new(context));
-    match server.run(thread_count) {
+    let udp_server = UdpServer::new(context_ptr.clone());
+    let tcp_server = TcpServer::new(context_ptr.clone());
+
+    // FIXME: need better way to collect server threads and join on them
+    let _ = tcp_server.run(thread_count);
+    match udp_server.run(thread_count) {
         Ok(handle) => handle.join().unwrap(),
         Err(e) => println!("Failed to run UDP server: {:?}", e),
     }
